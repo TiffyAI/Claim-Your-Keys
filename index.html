@@ -1,67 +1,140 @@
-<script>
-  const MS_IN_DAY = 120000; // 2 minutes cooldown for test run ✅
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TiffyAI Blue Key</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background: #0a0a23;
+      color: #00f0ff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .glass {
+      background: rgba(0, 0, 20, 0.75);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 0 15px #00f0ff88;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 0 10px #00f0ff;
+    }
+    .stats {
+      font-size: 1.1rem;
+      margin: 1rem 0;
+    }
+    .cooldown {
+      font-size: 0.95rem;
+      color: #ffffffaa;
+    }
+    button {
+      background: transparent;
+      border: 2px solid #00f0ff;
+      color: #00f0ff;
+      padding: 0.8rem 1.2rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s ease;
+      font-family: 'Orbitron', sans-serif;
+      width: 100%;
+    }
+    button:hover {
+      background: #00f0ff;
+      color: #000;
+      box-shadow: 0 0 10px #00f0ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="glass">
+    <h1>Unlocking TiffyAI</h1>
+    <div class="stats">🔵 Blue Keys: <span id="blueKeys">0</span></div>
+    <div class="stats cooldown" id="cooldownStatus">⏱️ Cooldown: Ready</div>
+    <button id="claimButton">🔐 Claim Blue Key</button>
+  </div>
 
-  const getWalletData = () => {
-    const wallets = JSON.parse(localStorage.getItem('tiffy_wallets') || '{}');
-    const currentWallet = (window.ethereum?.selectedAddress || 'default').toLowerCase();
-    if (!wallets[currentWallet]) {
-      wallets[currentWallet] = { blueKeys: 0, lastClaim: 0 };
+  <script>
+    const MS_IN_DAY = 120000; // ⚠️ 2 minutes for testing (120000 ms)
+
+    const getWalletData = () => {
+      const wallets = JSON.parse(localStorage.getItem('tiffy_wallets') || '{}');
+      const currentWallet = (window.ethereum?.selectedAddress || 'default').toLowerCase();
+      if (!wallets[currentWallet]) {
+        wallets[currentWallet] = { blueKeys: 0, lastClaim: 0 };
+        localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
+      }
+      return { wallets, currentWallet };
+    };
+
+    const updateUI = () => {
+      const { wallets, currentWallet } = getWalletData();
+      const data = wallets[currentWallet];
+      document.getElementById('blueKeys').textContent = data.blueKeys;
+      const now = Date.now();
+      const remaining = Math.max(0, MS_IN_DAY - (now - data.lastClaim));
+
+      const cooldownStatus = document.getElementById('cooldownStatus');
+      if (remaining > 0) {
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        cooldownStatus.textContent = `⏱️ Cooldown: ${mins}m ${secs}s remaining`;
+        document.getElementById('claimButton').disabled = true;
+      } else {
+        cooldownStatus.textContent = "✅ Ready to claim!";
+        document.getElementById('claimButton').disabled = false;
+      }
+    };
+
+    const notifyLater = () => {
+      if (Notification.permission === "granted") {
+        setTimeout(() => {
+          new Notification("🔔 TiffyAI: Your Blue Key is ready again!");
+        }, MS_IN_DAY);
+      }
+    };
+
+    const claimKey = () => {
+      const { wallets, currentWallet } = getWalletData();
+      const data = wallets[currentWallet];
+      const now = Date.now();
+
+      if (now - data.lastClaim < MS_IN_DAY) {
+        alert("⏳ Please wait for the cooldown to finish.");
+        return;
+      }
+
+      data.blueKeys += 1;
+      data.lastClaim = now;
       localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
-    }
-    return { wallets, currentWallet };
-  };
+      notifyLater();
+      updateUI();
+    };
 
-  const updateUI = () => {
-    const { wallets, currentWallet } = getWalletData();
-    const data = wallets[currentWallet];
-    document.getElementById('blueKeys').textContent = data.blueKeys;
-    const now = Date.now();
-    const remaining = Math.max(0, MS_IN_DAY - (now - data.lastClaim));
+    document.getElementById('claimButton').addEventListener('click', async () => {
+      if ('Notification' in window && Notification.permission !== "granted") {
+        await Notification.requestPermission();
+      }
+      claimKey();
+    });
 
-    const cooldownStatus = document.getElementById('cooldownStatus');
-    if (remaining > 0) {
-      const mins = Math.floor(remaining / 60000);
-      const secs = Math.floor((remaining % 60000) / 1000);
-      cooldownStatus.textContent = `⏱️ Cooldown: ${mins}m ${secs}s remaining`;
-      document.getElementById('claimButton').disabled = true;
-    } else {
-      cooldownStatus.textContent = "✅ Ready to claim!";
-      document.getElementById('claimButton').disabled = false;
-    }
-  };
-
-  const notifyLater = () => {
-    if (Notification.permission === "granted") {
-      setTimeout(() => {
-        new Notification("🔔 TiffyAI: Your Blue Key is ready again!");
-      }, MS_IN_DAY); // Triggers notification after 2 minutes
-    }
-  };
-
-  const claimKey = () => {
-    const { wallets, currentWallet } = getWalletData();
-    const data = wallets[currentWallet];
-    const now = Date.now();
-
-    if (now - data.lastClaim < MS_IN_DAY) {
-      alert("⏳ Please wait until the cooldown ends.");
-      return;
-    }
-
-    data.blueKeys += 1;
-    data.lastClaim = now;
-    localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
-    notifyLater();
     updateUI();
-  };
-
-  document.getElementById('claimButton').addEventListener('click', async () => {
-    if ('Notification' in window && Notification.permission !== "granted") {
-      await Notification.requestPermission();
-    }
-    claimKey();
-  });
-
-  updateUI();
-  setInterval(updateUI, 1000); // Refresh every second for smoother countdown
-</script>
+    setInterval(updateUI, 1000); // update every second
+  </script>
+</body>
+</html>
