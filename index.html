@@ -16,15 +16,14 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      overflow: hidden;
     }
     .glass {
       background: rgba(0, 0, 20, 0.75);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(10px);
       border-radius: 16px;
       padding: 1.5rem;
       width: 90%;
-      max-width: 480px;
+      max-width: 420px;
       text-align: center;
       box-shadow: 0 0 15px #00f0ff88;
     }
@@ -38,7 +37,7 @@
       margin: 1rem 0;
     }
     .cooldown {
-      font-size: 0.95rem;
+      font-size: 1rem;
       color: #ffffffaa;
     }
     button {
@@ -50,9 +49,9 @@
       font-size: 1rem;
       border-radius: 12px;
       cursor: pointer;
-      transition: 0.3s ease;
       font-family: 'Orbitron', sans-serif;
       width: 100%;
+      transition: 0.3s ease;
     }
     button:hover {
       background: #00f0ff;
@@ -69,86 +68,87 @@
     <button id="claimButton">🔐 Claim Blue Key</button>
   </div>
 
-  <audio id="notifySound" src="key.wav" preload="auto"></audio>
+  <audio id="notifySound" src="key.mp3" preload="auto"></audio>
 
   <script>
-    const MS_COOLDOWN = 2 * 60 * 1000; // 2 minutes for testing
+    const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes for test
 
-    // Request notification permission on page load
-    if ('Notification' in window && Notification.permission !== 'granted') {
-      Notification.requestPermission();
-    }
-
-    const getWalletData = () => {
+    const walletKey = () => {
       const wallets = JSON.parse(localStorage.getItem('tiffy_wallets') || '{}');
-      const currentWallet = (window.ethereum?.selectedAddress || 'default').toLowerCase();
-      if (!wallets[currentWallet]) {
-        wallets[currentWallet] = { blueKeys: 0, lastClaim: 0 };
+      const wallet = (window.ethereum?.selectedAddress || 'default').toLowerCase();
+      if (!wallets[wallet]) {
+        wallets[wallet] = { blueKeys: 0, lastClaim: 0 };
         localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
       }
-      return { wallets, currentWallet };
+      return { wallets, wallet };
     };
 
     const updateUI = () => {
-      const { wallets, currentWallet } = getWalletData();
-      const data = wallets[currentWallet];
-      document.getElementById('blueKeys').textContent = data.blueKeys;
+      const { wallets, wallet } = walletKey();
       const now = Date.now();
-      const remaining = Math.max(0, MS_COOLDOWN - (now - data.lastClaim));
+      const data = wallets[wallet];
 
-      const cooldownStatus = document.getElementById('cooldownStatus');
+      document.getElementById('blueKeys').textContent = data.blueKeys;
+
+      const remaining = Math.max(0, COOLDOWN_MS - (now - data.lastClaim));
       const btn = document.getElementById('claimButton');
+      const status = document.getElementById('cooldownStatus');
+
       if (remaining > 0) {
-        const mins = Math.floor(remaining / 60000);
-        const secs = Math.floor((remaining % 60000) / 1000);
-        cooldownStatus.textContent = `⏱️ Cooldown: ${mins}m ${secs}s remaining`;
+        const m = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        status.textContent = `⏱️ Cooldown: ${m}m ${s}s remaining`;
         btn.disabled = true;
       } else {
-        cooldownStatus.textContent = "✅ Ready to claim!";
+        status.textContent = "✅ Ready to claim!";
         btn.disabled = false;
       }
     };
 
-    const sendNotification = () => {
-      const icon = "Key.png";
-      const message = "🔔 Your blue key has just become available. You can Go Claim your TIFFY Tokens now.";
-
-      if (Notification.permission === "granted") {
-        new Notification("TiffyAI Reminder", {
-          body: message,
-          icon: icon
+    const triggerNotification = () => {
+      const sound = document.getElementById('notifySound');
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification("🔐 TiffyAI", {
+          body: "Your Blue Key is now ready to claim!",
+          icon: "Key.png"
         });
-        document.getElementById('notifySound').play().catch(e => {});
+        sound.play().catch(() => {});
       }
     };
 
     const scheduleNotification = () => {
-      if ('Notification' in window && Notification.permission === "granted") {
-        setTimeout(sendNotification, MS_COOLDOWN);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        setTimeout(triggerNotification, COOLDOWN_MS);
       }
     };
 
     const claimKey = () => {
-      const { wallets, currentWallet } = getWalletData();
-      const data = wallets[currentWallet];
+      const { wallets, wallet } = walletKey();
       const now = Date.now();
+      const data = wallets[wallet];
 
-      if (now - data.lastClaim < MS_COOLDOWN) {
-        alert("⏳ Please wait for the cooldown to finish.");
+      if (now - data.lastClaim < COOLDOWN_MS) {
+        alert("⏳ Not ready yet!");
         return;
       }
 
       data.blueKeys += 1;
       data.lastClaim = now;
       localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
-      scheduleNotification();
       updateUI();
+      scheduleNotification();
     };
 
     document.getElementById('claimButton').addEventListener('click', claimKey);
 
-    updateUI();
-    setInterval(updateUI, 1000);
+    // Request permission on load
+    window.addEventListener('load', () => {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+      updateUI();
+      setInterval(updateUI, 1000);
+    });
   </script>
 </body>
 </html>
