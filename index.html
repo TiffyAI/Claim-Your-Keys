@@ -1,0 +1,67 @@
+<script>
+  const MS_IN_DAY = 120000; // 2 minutes cooldown for test run ✅
+
+  const getWalletData = () => {
+    const wallets = JSON.parse(localStorage.getItem('tiffy_wallets') || '{}');
+    const currentWallet = (window.ethereum?.selectedAddress || 'default').toLowerCase();
+    if (!wallets[currentWallet]) {
+      wallets[currentWallet] = { blueKeys: 0, lastClaim: 0 };
+      localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
+    }
+    return { wallets, currentWallet };
+  };
+
+  const updateUI = () => {
+    const { wallets, currentWallet } = getWalletData();
+    const data = wallets[currentWallet];
+    document.getElementById('blueKeys').textContent = data.blueKeys;
+    const now = Date.now();
+    const remaining = Math.max(0, MS_IN_DAY - (now - data.lastClaim));
+
+    const cooldownStatus = document.getElementById('cooldownStatus');
+    if (remaining > 0) {
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      cooldownStatus.textContent = `⏱️ Cooldown: ${mins}m ${secs}s remaining`;
+      document.getElementById('claimButton').disabled = true;
+    } else {
+      cooldownStatus.textContent = "✅ Ready to claim!";
+      document.getElementById('claimButton').disabled = false;
+    }
+  };
+
+  const notifyLater = () => {
+    if (Notification.permission === "granted") {
+      setTimeout(() => {
+        new Notification("🔔 TiffyAI: Your Blue Key is ready again!");
+      }, MS_IN_DAY); // Triggers notification after 2 minutes
+    }
+  };
+
+  const claimKey = () => {
+    const { wallets, currentWallet } = getWalletData();
+    const data = wallets[currentWallet];
+    const now = Date.now();
+
+    if (now - data.lastClaim < MS_IN_DAY) {
+      alert("⏳ Please wait until the cooldown ends.");
+      return;
+    }
+
+    data.blueKeys += 1;
+    data.lastClaim = now;
+    localStorage.setItem('tiffy_wallets', JSON.stringify(wallets));
+    notifyLater();
+    updateUI();
+  };
+
+  document.getElementById('claimButton').addEventListener('click', async () => {
+    if ('Notification' in window && Notification.permission !== "granted") {
+      await Notification.requestPermission();
+    }
+    claimKey();
+  });
+
+  updateUI();
+  setInterval(updateUI, 1000); // Refresh every second for smoother countdown
+</script>
